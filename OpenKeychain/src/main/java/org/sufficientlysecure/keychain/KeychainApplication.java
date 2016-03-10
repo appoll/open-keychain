@@ -100,11 +100,13 @@ public class KeychainApplication extends Application {
         // Add OpenKeychain account to Android to link contacts with keys and keyserver sync
         createAccountIfNecessary(this);
 
-        // if first time, enable keyserver and contact sync
+        // if first time, enable contact sync
         if (Preferences.getPreferences(this).isFirstTime()) {
-            KeyserverSyncAdapterService.enableKeyserverSync(this);
             ContactSyncAdapterService.enableContactsSync(this);
         }
+
+        // will set a keyserver sync if one does not exist or the interval has changed
+        KeyserverSyncAdapterService.updateKeyserverSync(this);
 
         // Update keyserver list as needed
         Preferences.getPreferences(this).upgradePreferences(this);

@@ -480,7 +480,7 @@ public class Preferences {
                 }
                 // fall through
                 case 5: {
-                    KeyserverSyncAdapterService.enableKeyserverSync(context);
+                    KeyserverSyncAdapterService.updateKeyserverSync(context);
                 }
                 // fall through
                 case 6: {

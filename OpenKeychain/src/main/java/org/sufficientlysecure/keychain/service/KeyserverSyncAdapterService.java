@@ -11,6 +11,7 @@ import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.PeriodicSync;
 import android.content.SyncResult;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -509,7 +510,7 @@ public class KeyserverSyncAdapterService extends Service {
         return builder.build();
     }
 
-    public static void enableKeyserverSync(Context context) {
+    public static void updateKeyserverSync(Context context) {
         Account account = KeychainApplication.createAccountIfNecessary(context);
 
         if (account == null) {
@@ -519,12 +520,25 @@ public class KeyserverSyncAdapterService extends Service {
 
         ContentResolver.setIsSyncable(account, Constants.PROVIDER_AUTHORITY, 1);
         ContentResolver.setSyncAutomatically(account, Constants.PROVIDER_AUTHORITY, true);
-        ContentResolver.addPeriodicSync(
-                account,
-                Constants.PROVIDER_AUTHORITY,
-                new Bundle(),
-                SYNC_INTERVAL
-        );
+
+        boolean intervalChanged = false;
+        boolean syncExists = false;
+        for (PeriodicSync periodicSync:
+                ContentResolver.getPeriodicSyncs(account, Constants.PROVIDER_AUTHORITY)) {
+            // this loop should run only once as there should be only one existing sync
+            syncExists = true;
+            if (periodicSync.period != SYNC_INTERVAL) {
+                intervalChanged = true;
+            }
+        }
+        if (!syncExists || intervalChanged) {
+            ContentResolver.addPeriodicSync(
+                    account,
+                    Constants.PROVIDER_AUTHORITY,
+                    new Bundle(),
+                    SYNC_INTERVAL
+            );
+        }
     }
 
     private boolean isSyncEnabled() {
