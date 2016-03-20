@@ -242,26 +242,16 @@ public class KeyListFragment extends LoaderFragment
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         // This is called when a new Loader needs to be created. This
         // sample only has one Loader, so we don't care about the ID.
-        Uri baseUri = KeyRings.buildUnifiedKeyRingsUri();
-        String where = null;
-        String whereArgs[] = null;
-        if (mQuery != null) {
-            String[] words = mQuery.trim().split("\\s+");
-            whereArgs = new String[words.length];
-            for (int i = 0; i < words.length; ++i) {
-                if (where == null) {
-                    where = "";
-                } else {
-                    where += " AND ";
-                }
-                where += KeyRings.USER_ID + " LIKE ?";
-                whereArgs[i] = "%" + words[i] + "%";
-            }
+        Uri uri;
+        if (!TextUtils.isEmpty(mQuery)) {
+            uri = KeyRings.buildUnifiedKeyRingsFindByUserIdUri(mQuery);
+        } else {
+            uri = KeyRings.buildUnifiedKeyRingsUri();
         }
 
         // Now create and return a CursorLoader that will take care of
         // creating a Cursor for the data being displayed.
-        return new CursorLoader(getActivity(), baseUri, PROJECTION, null, null, ORDER);
+        return new CursorLoader(getActivity(), uri, PROJECTION, null, null, ORDER);
     }
 
     @Override
