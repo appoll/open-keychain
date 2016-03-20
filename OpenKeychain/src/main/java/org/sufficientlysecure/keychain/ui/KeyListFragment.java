@@ -21,6 +21,7 @@ package org.sufficientlysecure.keychain.ui;
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.MatrixCursor;
@@ -32,6 +33,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.LoaderManager;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v4.view.MenuItemCompat;
@@ -48,12 +50,11 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.ViewAnimator;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ViewAnimator;
 
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
@@ -72,19 +73,11 @@ import org.sufficientlysecure.keychain.provider.KeychainContract;
 import org.sufficientlysecure.keychain.provider.KeychainContract.KeyRings;
 import org.sufficientlysecure.keychain.provider.KeychainDatabase;
 import org.sufficientlysecure.keychain.provider.ProviderHelper;
-
 import org.sufficientlysecure.keychain.service.BenchmarkInputParcel;
 import org.sufficientlysecure.keychain.service.ConsolidateInputParcel;
 import org.sufficientlysecure.keychain.service.ImportKeyringParcel;
-import org.sufficientlysecure.keychain.ui.adapter.KeyListAdapter;
-import org.sufficientlysecure.keychain.ui.base.CryptoOperationHelper;
-import org.sufficientlysecure.keychain.service.CloudImportService;
-import org.sufficientlysecure.keychain.service.KeychainIntentService;
-import org.sufficientlysecure.keychain.service.PassphraseCacheService;
-import org.sufficientlysecure.keychain.service.ServiceProgressHandler;
 import org.sufficientlysecure.keychain.ui.adapter.RecyclerCursorAdapter;
-import org.sufficientlysecure.keychain.ui.dialog.DeleteKeyDialogFragment;
-import org.sufficientlysecure.keychain.ui.dialog.ProgressDialogFragment;
+import org.sufficientlysecure.keychain.ui.base.CryptoOperationHelper;
 import org.sufficientlysecure.keychain.ui.util.Highlighter;
 import org.sufficientlysecure.keychain.ui.util.KeyFormattingUtils;
 import org.sufficientlysecure.keychain.ui.util.Notify;
@@ -249,16 +242,26 @@ public class KeyListFragment extends LoaderFragment
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         // This is called when a new Loader needs to be created. This
         // sample only has one Loader, so we don't care about the ID.
-        Uri uri;
-        if (!TextUtils.isEmpty(mQuery)) {
-            uri = KeyRings.buildUnifiedKeyRingsFindByUserIdUri(mQuery);
-        } else {
-            uri = KeyRings.buildUnifiedKeyRingsUri();
+        Uri baseUri = KeyRings.buildUnifiedKeyRingsUri();
+        String where = null;
+        String whereArgs[] = null;
+        if (mQuery != null) {
+            String[] words = mQuery.trim().split("\\s+");
+            whereArgs = new String[words.length];
+            for (int i = 0; i < words.length; ++i) {
+                if (where == null) {
+                    where = "";
+                } else {
+                    where += " AND ";
+                }
+                where += KeyRings.USER_ID + " LIKE ?";
+                whereArgs[i] = "%" + words[i] + "%";
+            }
         }
 
         // Now create and return a CursorLoader that will take care of
         // creating a Cursor for the data being displayed.
-        return new CursorLoader(getActivity(), uri, PROJECTION, null, null, ORDER);
+        return new CursorLoader(getActivity(), baseUri, PROJECTION, null, null, ORDER);
     }
 
     @Override
@@ -268,12 +271,12 @@ public class KeyListFragment extends LoaderFragment
         mAdapter.setSearchQuery(mQuery);
 
         if (data != null && (mQuery == null || TextUtils.isEmpty(mQuery))) {
-            boolean isSecret = data.moveToFirst() && data.getInt(KeyListAdapter.INDEX_HAS_ANY_SECRET) != 0;
+            boolean isSecret = data.moveToFirst() && data.getInt(INDEX_HAS_ANY_SECRET) != 0;
             if (!isSecret) {
-                MatrixCursor headerCursor = new MatrixCursor(KeyListAdapter.PROJECTION);
-                Long[] row = new Long[KeyListAdapter.PROJECTION.length];
-                row[KeyListAdapter.INDEX_HAS_ANY_SECRET] = 1L;
-                row[KeyListAdapter.INDEX_MASTER_KEY_ID] = 0L;
+                MatrixCursor headerCursor = new MatrixCursor(PROJECTION);
+                Long[] row = new Long[PROJECTION.length];
+                row[INDEX_HAS_ANY_SECRET] = 1L;
+                row[INDEX_MASTER_KEY_ID] = 0L;
                 headerCursor.addRow(row);
 
                 Cursor dataCursor = data;
@@ -341,7 +344,6 @@ public class KeyListFragment extends LoaderFragment
         }
         startActivityForResult(intent, REQUEST_DELETE);
     }
-
 
 
     @Override
@@ -726,15 +728,6 @@ public class KeyListFragment extends LoaderFragment
                 showDeleteKeyDialog(actionMode, ids, mAdapter.isAnySecretSelected());
                 break;
             }
-            case R.id.menu_key_list_multi_export: {
-                ids = mAdapter.getCurrentSelectedMasterKeyIds();
-                showMultiExportDialog(ids);
-                break;
-            }
-            case R.id.menu_key_list_multi_select_all: {
-                mAdapter.selectAll();
-                break;
-            }
         }
         return true;
     }
@@ -1088,7 +1081,7 @@ public class KeyListFragment extends LoaderFragment
 
                 });
 
-                mSlingerImageButton.setColorFilter(mContext.getResources().getColor(R.color.tertiary_text_light),
+                mSlingerImageButton.setColorFilter(ContextCompat.getColor(mContext, R.color.tertiary_text_light),
                         PorterDuff.Mode.SRC_IN);
                 mSlingerImageButton.setOnClickListener(new View.OnClickListener() {
 
@@ -1110,7 +1103,7 @@ public class KeyListFragment extends LoaderFragment
 
                 if (item.mSelected) {
                     // selected position color
-                    itemView.setBackgroundColor(itemView.getResources().getColor(R.color.emphasis));
+                    itemView.setBackgroundColor(ContextCompat.getColor(mContext, R.color.emphasis));
                 } else {
                     // default color
                     itemView.setBackgroundColor(Color.TRANSPARENT);
@@ -1156,19 +1149,19 @@ public class KeyListFragment extends LoaderFragment
                     KeyFormattingUtils.setStatusImage(mContext, mStatusImageView, null, KeyFormattingUtils.State.REVOKED, R.color.bg_gray);
                     mStatusImageView.setVisibility(View.VISIBLE);
                     mSlingerLayout.setVisibility(View.GONE);
-                    mNameTextView.setTextColor(mContext.getResources().getColor(R.color.bg_gray));
-                    mEmailTextView.setTextColor(mContext.getResources().getColor(R.color.bg_gray));
+                    mNameTextView.setTextColor(ContextCompat.getColor(mContext, R.color.bg_gray));
+                    mEmailTextView.setTextColor(ContextCompat.getColor(mContext, R.color.bg_gray));
                 } else if (isExpired) {
                     KeyFormattingUtils.setStatusImage(mContext, mStatusImageView, null, KeyFormattingUtils.State.EXPIRED, R.color.bg_gray);
                     mStatusImageView.setVisibility(View.VISIBLE);
                     mSlingerLayout.setVisibility(View.GONE);
-                    mNameTextView.setTextColor(mContext.getResources().getColor(R.color.bg_gray));
-                    mEmailTextView.setTextColor(mContext.getResources().getColor(R.color.bg_gray));
+                    mNameTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
+                    mEmailTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
                 } else if (isSecret) {
                     mStatusImageView.setVisibility(View.GONE);
                     mSlingerLayout.setVisibility(View.VISIBLE);
-                    mNameTextView.setTextColor(mContext.getResources().getColor(R.color.black));
-                    mEmailTextView.setTextColor(mContext.getResources().getColor(R.color.black));
+                    mNameTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
+                    mEmailTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
                 } else {
                     // this is a public key - show if it's verified
                     if (isVerified) {
@@ -1179,8 +1172,8 @@ public class KeyListFragment extends LoaderFragment
                         mStatusImageView.setVisibility(View.VISIBLE);
                     }
                     mSlingerLayout.setVisibility(View.GONE);
-                    mNameTextView.setTextColor(mContext.getResources().getColor(R.color.black));
-                    mEmailTextView.setTextColor(mContext.getResources().getColor(R.color.black));
+                    mNameTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
+                    mEmailTextView.setTextColor(ContextCompat.getColor(mContext, R.color.black));
                 }
             }
 

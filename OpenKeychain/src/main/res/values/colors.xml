@@ -36,4 +36,8 @@
     <!-- linked ID view -->
     <color name="card_view_button">#7bad45</color>
 
+    <color name="bg_gray">#cecbce</color>
+    <color name="black">#000000</color>
+    <color name="tertiary_text_light">#808080</color>
+    <color name="emphasis">@color/accent</color>
 </resources>
